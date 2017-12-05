@@ -1,16 +1,7 @@
-// TO DO:
-// CHECK CUSTUMERQUANT AGAINST STOCK.
-// PROVIDE TOTAL COST TO CUSTOMER
-
-
-
-
-
-
 const mysql = require('mysql');
 const inquirer = require('inquirer');
 
-let connection = mysql.createConnection({
+const connection = mysql.createConnection({
   host: "localhost",
   port: 3306,
   // Your username
@@ -21,16 +12,15 @@ let connection = mysql.createConnection({
 });
 
 connection.connect(function(err){
-if(err) throw err;
-console.log(`Connected as id ${connection.threadId}`);
+	if(err) throw err;
+	console.log(`Connected as id ${connection.threadId}`);
+	console.log(`=================================================`);
 })
-
-let wantedProduct;
-let wantedQuantity;
 
 function displayProducts(){
 	connection.query('SELECT * FROM products', function(err, res){
 		if(err) throw err;
+
 		for (var i = 0; i < res.length; i++) {
 			console.log(`ID: ${res[i].item_id}`);
 			console.log(`NAME: ${res[i].product_name}`);
@@ -43,28 +33,6 @@ function displayProducts(){
 	})
 
 }
-
-displayProducts();
-
-
-
-function checkQuantity(quant) {
-					connection.query('SELECT * FROM products WHERE ?',{item_id: wantedProduct}, function(err, res){
-						if(err) throw err;
-						console.log(`IN STOCK: ${res[0].stock_quantity}`);
-						console.log(`WANTED: ${quant}`);
-						if (res[0].stock_quantity >= quant) {
-							console.log(`You are going to purchase ${quant} ${res[0].product_name}`);
-							console.log(`Your total cost is $${res[0].price * quant}`);
-						}
-						else {
-							console.log(`There is not enough ${res[0].product_name} to fill that order`);
-						}
-					})
-}
-
-
-
 
 function chooseProduct() {
 	inquirer.prompt([
@@ -79,18 +47,41 @@ function chooseProduct() {
 			message: "How many would you like?",
 		}
 	]).then(answers => {
+
 		wantedProduct = answers.CustomerResp;
-		wantedQuantity = answers.CustomerQuant;
+		wantedQuantity = parseInt(answers.CustomerQuant);
 
-		console.log(wantedProduct);
-		console.log(wantedQuantity);
-
-				connection.query('SELECT * FROM products WHERE ?',{item_id: wantedProduct}, function(err, res){
-					if(err) throw err;
-					// console.log(res);
-					checkQuantity(wantedQuantity);
-				})
+		connection.query('SELECT * FROM products WHERE ?',{item_id: wantedProduct}, function(err, res){
+			if(err) throw err;
+			checkQuantity(wantedQuantity);
+		})
 
 	});
 
 }
+
+function updateStock(newStock){
+	connection.query(`UPDATE products SET stock_quantity=${newStock} WHERE ?`,{item_id: wantedProduct});
+	connection.end();
+}
+
+function checkQuantity(quant) {
+		connection.query('SELECT * FROM products WHERE ?',{item_id: wantedProduct}, function(err, res){
+			if(err) throw err;
+			if (res[0].stock_quantity >= quant) {
+				console.log(`You are going to purchase ${quant} ${res[0].product_name}`);
+				console.log(`Your total cost is $${res[0].price * quant}`);
+				let stock_remaining = res[0].stock_quantity - quant;
+				updateStock(stock_remaining);
+			}
+			else {
+				console.log(`There is not enough ${res[0].product_name} to fill that order.`);
+				connection.end();
+			}
+		})
+}
+
+let wantedProduct;
+let wantedQuantity;
+
+displayProducts();
